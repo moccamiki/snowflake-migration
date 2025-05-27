@@ -15,13 +15,13 @@ make install
 ### 2. 環境変数の設定
 .env.example を元に .env ファイルを作成してください。
 ```env
-ENV=dev
+ENVIRONMENT=dev
 SNOWFLAKE_USER=your_user
 SNOWFLAKE_PASSWORD=your_password
 SNOWFLAKE_ACCOUNT=your_account
-SNOWFLAKE_DATABASE=sv_leauge_${ENV}
+SNOWFLAKE_DATABASE=sv_leauge_${ENVIRONMENT}
 SNOWFLAKE_SCHEMA=mbk_schema
-SNOWFLAKE_WAREHOUSE=mbk_wh_${ENV}
+SNOWFLAKE_WAREHOUSE=mbk_wh_${ENVIRONMENT}
 SNOWFLAKE_ROLE=SYSADMIN
 ```
 
