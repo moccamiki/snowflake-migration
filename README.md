@@ -4,52 +4,75 @@ Snowflake のスキーママイグレーションを管理するためのプロ�
 
 Makefile のコマンドを使って、マイグレーションの作成・適用・ダウンロール・プレビューが簡単に行えます。
 
-## セットアップ
-### 1. golang-migrate CLI のインストール
+## Local環境構築
+### 1. go　のインストール
+このプロジェクトでは Go が必要です（バージョン 1.21 以上推奨）。
+Go をインストールしていない場合は、以下からインストールしてください：
+- [Go公式サイト](https://go.dev/dl/)
+
+### 2. golang-migrate CLI のインストール
 ```bash
 make install
 ```
-
 「./bin/migrate」 に CLI がインストールされます。
 
-### 2. 環境変数の設定
-.env.example を元に .env ファイルを作成してください。
-```env
-ENVIRONMENT=dev
-SNOWFLAKE_USER=your_user
-SNOWFLAKE_PASSWORD=your_password
-SNOWFLAKE_ACCOUNT=your_account
-SNOWFLAKE_DATABASE=sv_leauge_${ENVIRONMENT}
-SNOWFLAKE_SCHEMA=mbk_schema
-SNOWFLAKE_WAREHOUSE=mbk_wh_${ENVIRONMENT}
-SNOWFLAKE_ROLE=SYSADMIN
+### 3. 環境変数の設定
+まず、テンプレートとして提供されている `env_sample/` 配下のファイルを `env/` ディレクトリへコピーしてください。
+```bash
+cp -r env_sample env
 ```
+
+コピー後、`env/` ディレクトリに以下のような環境ごとの設定ファイルが作成されます。
+```
+env/
+├── dev.env
+├── stg.env
+├── prd.env
+└── poc.env
+```
+各 `.env` ファイルの中身を自分の接続情報に応じて編集してください。
+（例：Snowflakeのユーザー名・パスワード・アカウント・ロールなど）
 
 ## ディレクトリ構成
 ```
 .
-├── Makefile
-├── create-migration.sh
+├── .github/
+│   └── workflows/
+│       ├── migrate-dev.yml
+│       ├── migrate-poc.yml
+│       ├── migrate-prd.yml
+│       └── migrate-stg.yml
+├── bin/
+│   └── migrate
+├── env/
+│   ├── dev.env
+│   ├── poc.env
+│   ├── prd.env
+│   └── stg.env
+├── env_sample/
+│   ├── dev.env
+│   ├── poc.env
+│   ├── prd.env
+│   └── stg.env
 ├── migrations/
 │   ├── 001_xxx.up.sql
 │   └── 001_xxx.down.sql
-└── bin/
-    └── migrate
+├── .env                # ローカル実行用に env からコピーされる
+├── .gitignore
+├── Makefile
+├── create-migration.sh
+└── README.md
 ```
 
-## 使い方
+## マイグレーションの使い方
 ### マイグレーションファイルの作成
-
 ```bash
 make create <名前>
 ```
-
 例:
-
 ```bash
 make create add_email_column
 ```
-
 ```
 migrations/002_add_email_column.up.sql
 migrations/002_add_email_column.down.sql
@@ -59,36 +82,26 @@ migrations/002_add_email_column.down.sql
 ```bash
 make dryrun
 ```
-
 出力例:
 ```
-Current version: 2
-Up files to apply: 003_add_profile.up.sql 004_add_index.up.sql
-Down files to revert: 002_add_email.down.sql
+current version: 0
+up files  :   001_first_pipeline.up.sql
+down files:
 ```
 
 ### マイグレーションの適用
 ```bash
-make up <適用する件数>
-```
-
-```bash
 make up 1
 ```
-
 バージョンを 1 つだけ進めます
 
 ### マイグレーションのロールバック
 ```bash
-make down <戻す件数>
-```
-```bash
 make down 1
 ```
-
 直前のマイグレーションを 1 つ戻します
 
-### 現在のバージョン確認
+### 現在のマイグレーションバージョン確認
 ```bash
 make version
 ```
@@ -97,7 +110,21 @@ make version
 * `make up` や `make down` は、必ず数値定義あり (1 以上) で実行するようにしています
 * `make up 2` なら、現在のバージョンから2件分だけ up されます
 * `goto` や `reset` などの強制操作はこのプロジェクトでは使用しません
+* マイグレーション中にエラーが発生した場合、それ以降の処理は実行されませんが、**エラー発生前に実行されたクエリは Snowflake 上で既に反映済みとなります**。再実行時はバージョン管理とマイグレーション状態の整合性に十分注意してください
 
 ## 権限について
-初期構築や DDL 適用には Snowflake の `SYSADMINのみで行います`。ACCOUNTADMINは使用しません。
-.env 内の `SNOWFLAKE_ROLE` を適切に設定してください
+初期構築や DDL 適用には Snowflake の `SYSADMIN` のみで行います。`ACCOUNTADMIN` は使用しません。
+`.env` 内の `SNOWFLAKE_ROLE` を適切に設定してください。
+
+## GitHub Actions による実行
+このリポジトリでは、GitHub Actions を利用して POC 環境などへのマイグレーションを実行できます。
+
+- 対象ファイル: `.github/workflows/migrate-poc.yml`
+- 実行方法: GitHub UI 上から「Run workflow」を選択し、以下を指定して実行
+  - `operation`: `up`, `down`, `dryrun` のいずれか
+  - `count`: `1` 以上の整数（`up` や `down` 時のみ）
+- 認証情報（ユーザー名やパスワードなど）は GitHub Secrets に登録し、`.env` は使用しません。
+
+Secrets 名（例: `SNOWFLAKE_USER_POC`, `SNOWFLAKE_PASSWORD_POC` など）に対応して `env:` に渡されています。
+
+これにより、`.env` ファイルをGitHubに置かず、安全にCI/CDマイグレーションを行う構成としています。
