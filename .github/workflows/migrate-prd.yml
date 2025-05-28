@@ -1,0 +1,58 @@
+name: Migrate prd - ${{ github.event.inputs.operation }} ${{ github.event.inputs.count }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Migration operation'
+        required: true
+        default: 'dryrun'
+        type: choice
+        options:
+          - dryrun
+          - up
+          - down
+      count:
+        description: 'How many steps (for up/down)?'
+        required: false
+        default: '1'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Install migrate CLI
+        run: |
+          mkdir -p ./bin
+          GOBIN=$(pwd)/bin go install github.com/golang-migrate/migrate/v4/cmd/migrate@v4.16.2
+
+      - name: Run migration operation
+        run: |
+          case "${{ github.event.inputs.operation }}" in
+            "up")
+              make up ${{ github.event.inputs.count }}
+              ;;
+            "down")
+              make down ${{ github.event.inputs.count }}
+              ;;
+            "dryrun")
+              make dryrun
+              ;;
+            *)
+              echo "Invalid operation"; exit 1
+              ;;
+          esac
+        env:
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER_PRD }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD_PRD }}
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT_PRD }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE_PRD }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA_PRD }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE_PRD }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE_PRD }}
