@@ -80,7 +80,7 @@ migrations/002_add_email_column.down.sql
 
 ### dryrun で適用予定ファイルの一括表示
 ```bash
-make dryrun
+make dryrun env=dev
 ```
 出力例:
 ```
@@ -91,13 +91,13 @@ down files:
 
 ### マイグレーションの適用
 ```bash
-make up 1
+make up env=dev count=1
 ```
 バージョンを 1 つだけ進めます
 
 ### マイグレーションのロールバック
 ```bash
-make down 1
+make down env=dev count=1
 ```
 直前のマイグレーションを 1 つ戻します
 
@@ -128,3 +128,27 @@ make version
 Secrets 名（例: `SNOWFLAKE_USER_POC`, `SNOWFLAKE_PASSWORD_POC` など）に対応して `env:` に渡されています。
 
 これにより、`.env` ファイルをGitHubに置かず、安全にCI/CDマイグレーションを行う構成としています。
+
+# Snowflake接続確認
+# セットアップ
+```bash
+go mod tidy
+```
+
+## env修正
+env/*.env を修正してください
+
+## 接続確認
+go run test_connection.go poc
+
+## トラブルシューティング
+このリポジトリには `go.mod` / `go.sum` が含まれているため、以下で依存が自動取得されます
+もし接続コマンドを打ってもうまく行かない場合は以下のコマンドを実行してください
+```bash
+# 1. Goプロジェクト初期化
+go mod init snowflake-migration
+
+# 2. ライブラリのインストール
+go get github.com/joho/godotenv
+go get github.com/snowflakedb/gosnowflake
+```
