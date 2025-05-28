@@ -1,5 +1,21 @@
 .DEFAULT_GOAL := help
 
+ENV ?=
+COUNT ?=
+
+ENV_FILE := env/$(ENV).env
+
+ifeq ($(ENV),)
+  $(error ENV is not set. Usage: make up env=dev count=1)
+endif
+
+ifeq ($(wildcard $(ENV_FILE)),)
+  $(error $(ENV_FILE) does not exist)
+endif
+
+include $(ENV_FILE)
+export
+
 MIGRATE_BIN=./bin/migrate
 MIGRATIONS_DIR=./migrations
 DB_URL=snowflake://$(SNOWFLAKE_USER):$(SNOWFLAKE_PASSWORD)@$(SNOWFLAKE_ACCOUNT)/$(SNOWFLAKE_DATABASE)/$(SNOWFLAKE_SCHEMA)?warehouse=$(SNOWFLAKE_WAREHOUSE)&role=$(SNOWFLAKE_ROLE)
@@ -23,27 +39,24 @@ dryrun:  ## migration up ファイル一覧を表示
 	awk -F'/' -v curr=$$CURRENT_VERSION '{split($$NF,a,"_"); if (a[1]+0 > curr) printf "%s ", $$NF}'`; \
 	DOWN_FILES=`find $(MIGRATIONS_DIR) -type f -name '*.down.sql' | sort -r | \
 	awk -F'/' -v curr=$$CURRENT_VERSION '{split($$NF,a,"_"); if (a[1]+0 == curr) printf "%s ", $$NF}'`; \
-	echo "  up file  :   $$UP_FILES"; \
-	echo "  down file: $$DOWN_FILES"
+	echo "  up files  : $$UP_FILES"; \
+	echo "  down files: $$DOWN_FILES"
 
-up:  ## マイグレーションを適用します（例: make up 1）
-	@COUNT=$(word 2,$(MAKECMDGOALS)); \
-	if [ "$$COUNT" = "" ]; then \
-		echo "  ERROR: Migration count is required. Usage: make up <number>"; \
+up:  ## マイグレーションを適用します（例: make up env=dev count=1）
+	@if [ "$(COUNT)" = "" ]; then \
+		echo "  ERROR: Migration count is required. Usage: make up env=dev count=1"; \
 		exit 1; \
 	fi; \
-	echo "  Applying $$COUNT migration(s)"; \
-	$(MIGRATE_BIN) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" up $$COUNT
+	echo "  Applying $(COUNT) migration(s) to $(ENV)"; \
+	$(MIGRATE_BIN) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" up $(COUNT)
 
-down:  ## マイグレーションを取り消します（例: make down 1）
-	@COUNT=$(word 2,$(MAKECMDGOALS)); \
-	if [ "$$COUNT" = "" ]; then \
-		echo "  ERROR: Migration count is required. Usage: make down <number>"; \
+down:  ## マイグレーションを取り消します（例: make down env=dev count=1）
+	@if [ "$(COUNT)" = "" ]; then \
+		echo "  ERROR: Migration count is required. Usage: make down env=dev count=1"; \
 		exit 1; \
 	fi; \
-	echo "  Reverting $$COUNT migration(s)"; \
-	$(MIGRATE_BIN) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" down $$COUNT
-
+	echo "  Reverting $(COUNT) migration(s) from $(ENV)"; \
+	$(MIGRATE_BIN) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" down $(COUNT)
 
 version:  ## 現在のマイグレーションバージョンを確認します
 	$(MIGRATE_BIN) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" version
